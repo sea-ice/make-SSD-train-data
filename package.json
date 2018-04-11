@@ -1,0 +1,28 @@
+{
+  "name": "make-ssd-train-data",
+  "version": "1.0.0",
+  "description": "Make train data for SSD-tensorflow",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sea-ice/make-SSD-train-data.git"
+  },
+  "keywords": [
+    "SSD-tensorflow"
+  ],
+  "author": "Jack",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sea-ice/make-SSD-train-data/issues"
+  },
+  "homepage": "https://github.com/sea-ice/make-SSD-train-data#readme",
+  "dependencies": {
+    "chalk": "^2.3.2",
+    "vue": "^2.5.16",
+    "xml2js": "^0.4.19"
+  }
+}

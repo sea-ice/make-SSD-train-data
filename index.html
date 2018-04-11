@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <link rel="stylesheet" href="./assets/css/index.css" />
+</head>
+
+<body>
+  <div id="app">
+    <main class="app-main">
+      <div class="canvas-wrapper" v-if="currentImage">
+        <canvas id="image" :width="currentImage.width" :height="currentImage.height" @mousedown="handleMouseDownOnCanvas" @mousemove="handleMouseMoveOnCanvas"
+          @mouseup="handleMouseUpOnCanvas"></canvas>
+        <canvas class="image-area" :width="currentImage.width" :height="currentImage.height" v-for="area in currentImageAreas" @mousedown="handleMouseDownOnCanvas"
+          @mousemove="handleMouseMoveOnCanvas" @mouseup="handleMouseUpOnCanvas" :id="`image-area-${area.id}`"></canvas>
+      </div>
+      <aside class="image-wrapper">
+        <ul class="image-slider" v-if="images.length" @click="selectImage">
+          <li v-for="image in images">
+            <a href="javascript:void(0);">
+              <img :data-image-name="image.name" @load="handleImageLoad($event, image)" :src="image.url" alt="">
+            </a>
+          </li>
+        </ul>
+      </aside>
+      <aside class="options-wrapper">
+        <form action="#">
+          <div class="categories">
+            <h2>选择分类</h2>
+            <div class="category" v-for="type in types">
+              <input type="radio" name="image-type" :id="`type-${type.id}`" :value="type.id" v-model="currentTypeId">
+              <label :for="`type-${type.id}`">
+                {{type.name}}
+                <span 
+                  class="color-block"
+                  :style="{backgroundColor: type.color}"
+                ></span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </aside>
+      <footer>
+        <div class="button-wrapper" :class="{disabled: !currentImage}" @click="handleButtonClick">
+          <a href="javascript:void(0);" class="undo">
+            <i class="icon undo-icon" data-click-type="undo"></i>
+          </a>
+          <a href="javascript:void(0);" class="prev">
+            <i class="icon prev-icon" data-click-type="prev"></i>
+          </a>
+          <a href="javascript:void(0);" class="next">
+            <i class="icon next-icon" data-click-type="next"></i>
+          </a>
+        </div>
+        <a href="javascript:void(0);" id="create-xml-doc" @click="createXmlDoc" :disabled="images.length ? null : 'disabled'">生成XML文档</a>
+      </footer>
+    </main>
+  </div>
+  <script src="./assets/js/vue.min.js"></script>
+  <script>
+    let {
+      ipcRenderer
+    } = require('electron')
+    let app = new Vue({
+      el: '#app',
+      data: {
+        images: [],
+        types: [],
+        currentTypeId: null,
+        currentImageAreas: [],
+        currentImage: null
+      },
+      created: function () {
+        let self = this
+        this.typeId = 1
+        // 获取分类信息
+        ipcRenderer.on('image-types', (event, message) => {
+          self.types = JSON.parse(message)
+          if (self.types.length) {
+            self.types.forEach(t => {
+              t.id = self.typeId++
+            })
+            self.currentTypeId = self.types[0].id
+          }
+        })
+        // 保存绘制信息到本地
+        window.addEventListener('beforeunload', function () {
+          console.log(self.safeStringify(self.images))
+          debugger
+          localStorage.setItem('__IMAGES__', self.safeStringify(self.images))
+        })
+        
+        let storeImages = localStorage.getItem('__IMAGES__')
+        console.log(storeImages)
+        if (storeImages) {
+          let useStorage = confirm('是否使用上次标注的数据？')
+          if (useStorage) {
+            console.log(JSON.parse(storeImages))
+            this.images = JSON.parse(storeImages)
+            console.log(this.images)
+            return
+          }
+        }
+        // 获取图像信息
+        ipcRenderer.on('images-to-process', (event, message) => {
+          console.log(message)
+          self.images = JSON.parse(message).map(url => ({
+            url,
+            name: url.split('/').pop()
+          }))
+        })
+      },
+      watch: {
+        images: function (newVal, oldVal) {
+          console.log(newVal)
+          debugger
+        }
+      },
+      methods: {
+        handleImageLoad: function (e, image) {
+          image.width = e.target.naturalWidth
+          image.height = e.target.naturalHeight
+          // 如果images.areas不存在，则进行初始化（存在则是来源于本地缓存）
+          if (!image.areas) image.areas = []
+        },
+        selectImage: function (e) {
+          var imageName = e.target.getAttribute('data-image-name'),
+              self = this
+          if (!imageName ||
+            this.currentImage && (this.currentImage.name === imageName)
+          ) return
+          // 显示当前操作的图片以及图像上的画框区域
+          this.currentImage = this.images.filter(image => image.name === imageName)[0]
+          this.currentImageAreas.splice(
+            0, this.currentImageAreas.length,
+            ...this.currentImage.areas
+          )
+          console.log(this.currentImageAreas)
+          let imageWidth = this.currentImage.width,
+              imageHeight = this.currentImage.height
+          setTimeout(function () {
+            let ctx = document.getElementById('image').getContext('2d')
+            ctx.drawImage(e.target, 0, 0, imageWidth, imageHeight, 0, 0, imageWidth, imageHeight)
+            self.currentImageAreas.forEach(area => {
+              if (!area.canvas) area.canvas = document.getElementById(`image-area-${area.id}`)
+              let ctx = area.canvas.getContext('2d'),
+                  {
+                    xmin,
+                    ymin,
+                    xmax,
+                    ymax,
+                    lineColor
+                  } = area
+              ctx.strokeStyle = lineColor
+              ctx.lineWidth = 1
+              ctx.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin)
+            })
+          }, 20)
+          // {
+          //   types: [{
+          //     color,
+          //     name
+          //   }]
+          //   currentImage: {
+          //     name,
+          //     width,
+          //     height
+          //     areas: [{
+          //       id
+          //       xmin,
+          //       ymin,
+          //       xmax,
+          //       ymax,
+          //       typeName
+          //     }]
+          //   }
+          //   currentXml: []
+          // }
+        },
+        handleMouseDownOnCanvas: function (e) {
+          console.log(e)
+          this.cutting = true
+          this.currentAreaId = this.getRandomString()
+          this.startPoint = [e.offsetX, e.offsetY]
+        },
+        handleMouseUpOnCanvas: function (e) {
+          this.cutting = false
+          if (this.targetArea) {
+            if (
+              e.offsetX > this.targetArea.xmin &&
+              e.offsetY > this.targetArea.ymin
+            ) {
+              this.targetArea.xmax = e.offsetX
+              this.targetArea.ymax = e.offsetY
+              // 添加到图像集合中对应图像的areas中
+              this.currentImage.areas.push(this.targetArea)
+            } else {
+              // 反向画框则表示取消当前正在绘制的框
+              this.currentImageAreas.pop()
+            }
+            this.targetArea = null
+            this.timer = null
+          }
+        },
+        handleMouseMoveOnCanvas: function (e) {
+          if (this.cutting) {
+            let self = this
+            // filter方法如果没有得到过滤项则返回[]
+            this.targetArea = this.currentImageAreas.filter(area => {
+              return area.id === self.currentAreaId
+            })[0]
+            console.log(this.targetArea)
+            if (this.targetArea) {
+              let canvas = this.targetArea.canvas
+              if (canvas) {
+                let ctx = canvas.getContext('2d'),
+                  {
+                    xmin,
+                    ymin,
+                    lineColor
+                  } = this.targetArea
+                // 清除前面鼠标移动时绘制的矩形
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                ctx.lineWidth = 1
+                ctx.strokeStyle = lineColor
+                ctx.strokeRect(xmin, ymin, e.offsetX - xmin, e.offsetY - ymin)
+              } else {
+                if (!this.timer) {
+                  // 延时确保push的框对应的canvas添加到页面中
+                  this.timer = setTimeout(function () {
+                    self.targetArea.canvas = e.target
+                  }, 20)
+                }
+              }
+            } else {
+              let {color, name} = this.types.filter(
+                t => t.id === this.currentTypeId
+              )[0]
+              this.currentImageAreas.push({
+                id: this.currentAreaId,
+                xmin: this.startPoint[0],
+                ymin: this.startPoint[1],
+                lineColor: color,
+                typeName: name
+              })
+            }
+          }
+        },
+        handleButtonClick: function (e) {
+          let clickType = e.target.getAttribute('data-click-type')
+          switch (clickType) {
+            case 'undo':
+              this.handleUndo()
+              break
+            case 'prev':
+              this.toggleImage(-1)
+              break
+            case 'next':
+              this.toggleImage(1)
+              break
+            default:
+              break
+          }
+        },
+        handleUndo: function () {
+          console.log('hello')
+          if (this.currentImageAreas.length) {
+            this.currentImageAreas.pop()
+            this.currentImage.areas.pop()
+          }
+        },
+        toggleImage: function (step) {
+          let currentIndex = this.images.findIndex(
+            image => image.name === this.currentImage.name
+          )
+          if (this.images[currentIndex + step]) {
+            this.currentImage = this.images[currentIndex + step]
+          }
+        },
+        createXmlDoc: function () {
+          ipcRenderer.send('handled-images', this.safeStringify(this.images))
+          // 生成XML文档之后移除本地缓存
+          localStorage.removeItem('__IMAGES__')
+        },
+        safeStringify: function (images) {
+          // 序列化之前清除对象中的canvas属性          
+          images.forEach(image => {
+            image.areas.forEach(area => area.canvas = null)
+          })
+          return JSON.stringify(images)
+        },
+        getRandomString: function () {
+          return Math.random().toString(36).substr(2)
+        }
+      }
+    })
+  </script>
+</body>
+
+</html>
