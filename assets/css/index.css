@@ -3,6 +3,9 @@ ul {
     margin: 0;
     list-style: none;
 }
+::-webkit-scrollbar {
+    display: none;
+}
 body, p, h2 {
     margin: 0;
 }
@@ -27,14 +30,28 @@ html, body {
 }
 
 .image-slider li {
-    padding: 10px;
+    padding: 5px;
 }
 .image-slider a {
     display: block;
+    padding: 5px;
+    border: 1px solid transparent;    
+}
+
+.image-slider a.selected {
+    border-color: #FF6107;
 }
 .image-slider img {
     width: 100%;
     vertical-align: top;
+}
+
+.image-name {
+    line-height: 30px;
+    font-size: 14px;
+    text-align: center;
+    color: #707070;
+    margin: 0;
 }
 
 .options-wrapper {
@@ -53,6 +70,14 @@ html, body {
     height: 100%;
     box-sizing: border-box;
     padding: 0 180px 50px 220px;
+}
+
+.current-image-name {
+    padding-top: 20px;
+    line-height: 40px;
+    text-align: center;
+    font-size: 20px;
+    border-bottom: 1px solid #999;
 }
 
 #image,

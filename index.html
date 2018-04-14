@@ -13,6 +13,7 @@
   <div id="app">
     <main class="app-main">
       <div class="canvas-wrapper" v-if="currentImage">
+        <h2 class="current-image-name">{{ currentImage.name }}</h2>
         <canvas id="image" :width="currentImage.width" :height="currentImage.height" @mousedown="handleMouseDownOnCanvas" @mousemove="handleMouseMoveOnCanvas"
           @mouseup="handleMouseUpOnCanvas"></canvas>
         <canvas class="image-area" :width="currentImage.width" :height="currentImage.height" v-for="area in currentImageAreas" @mousedown="handleMouseDownOnCanvas"
@@ -21,8 +22,9 @@
       <aside class="image-wrapper">
         <ul class="image-slider" v-if="images.length" @click="selectImage">
           <li v-for="image in images">
-            <a href="javascript:void(0);">
+            <a href="javascript:void(0);" :class="{selected: currentImage && (currentImage.name === image.name)}">
               <img :data-image-name="image.name" @load="handleImageLoad($event, image)" :src="image.url" alt="">
+              <h3 class="image-name">{{ image.name }}</h3>
             </a>
           </li>
         </ul>
@@ -89,23 +91,18 @@
         })
         // 保存绘制信息到本地
         window.addEventListener('beforeunload', function () {
-          console.log(self.safeStringify(self.images))
-          debugger
-          localStorage.setItem('__IMAGES__', self.safeStringify(self.images))
+          localStorage.setItem('__IMAGES__', JSON.stringify(self.images))
         })
-        
         let storeImages = localStorage.getItem('__IMAGES__')
-        console.log(storeImages)
         if (storeImages) {
           let useStorage = confirm('是否使用上次标注的数据？')
           if (useStorage) {
-            console.log(JSON.parse(storeImages))
             this.images = JSON.parse(storeImages)
             console.log(this.images)
             return
           }
         }
-        // 获取图像信息
+        // 从主进程获取图像信息
         ipcRenderer.on('images-to-process', (event, message) => {
           console.log(message)
           self.images = JSON.parse(message).map(url => ({
@@ -115,9 +112,38 @@
         })
       },
       watch: {
-        images: function (newVal, oldVal) {
-          console.log(newVal)
-          debugger
+        currentImage: function (newVal, oldVal) {
+          if (newVal !== oldVal) {
+            this.currentImageAreas.splice(
+              0, this.currentImageAreas.length,
+              ...newVal.areas
+            )
+            let imageWidth = newVal.width,
+                imageHeight = newVal.height,
+                self = this
+            this.$nextTick(function () {
+              let ctx = document.getElementById('image').getContext('2d')
+              ctx.drawImage(document.querySelector(
+                `img[data-image-name='${newVal.name}']`
+              ), 0, 0, imageWidth, imageHeight, 0, 0, imageWidth, imageHeight)
+              self.currentImageAreas.forEach(area => {
+                let canvas = document.getElementById(`image-area-${area.id}`)
+                let ctx = canvas.getContext('2d'),
+                    {
+                      xmin,
+                      ymin,
+                      xmax,
+                      ymax,
+                      lineColor
+                    } = area
+                // 在切换当前图像时，图像画框区域在绘制时会复用页面已有的canvas元素（vue默认使用的就地复用策略），在绘制之前先清除canvas上的内容以保证不会
+                ctx.clearRect(0, 0, imageWidth, imageHeight)
+                ctx.strokeStyle = lineColor
+                ctx.lineWidth = 1
+                ctx.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin)
+              })
+            })
+          }
         }
       },
       methods: {
@@ -128,38 +154,12 @@
           if (!image.areas) image.areas = []
         },
         selectImage: function (e) {
-          var imageName = e.target.getAttribute('data-image-name'),
-              self = this
+          var imageName = e.target.getAttribute('data-image-name')
           if (!imageName ||
             this.currentImage && (this.currentImage.name === imageName)
           ) return
           // 显示当前操作的图片以及图像上的画框区域
           this.currentImage = this.images.filter(image => image.name === imageName)[0]
-          this.currentImageAreas.splice(
-            0, this.currentImageAreas.length,
-            ...this.currentImage.areas
-          )
-          console.log(this.currentImageAreas)
-          let imageWidth = this.currentImage.width,
-              imageHeight = this.currentImage.height
-          setTimeout(function () {
-            let ctx = document.getElementById('image').getContext('2d')
-            ctx.drawImage(e.target, 0, 0, imageWidth, imageHeight, 0, 0, imageWidth, imageHeight)
-            self.currentImageAreas.forEach(area => {
-              if (!area.canvas) area.canvas = document.getElementById(`image-area-${area.id}`)
-              let ctx = area.canvas.getContext('2d'),
-                  {
-                    xmin,
-                    ymin,
-                    xmax,
-                    ymax,
-                    lineColor
-                  } = area
-              ctx.strokeStyle = lineColor
-              ctx.lineWidth = 1
-              ctx.strokeRect(xmin, ymin, xmax - xmin, ymax - ymin)
-            })
-          }, 20)
           // {
           //   types: [{
           //     color,
@@ -178,7 +178,6 @@
           //       typeName
           //     }]
           //   }
-          //   currentXml: []
           // }
         },
         handleMouseDownOnCanvas: function (e) {
@@ -203,7 +202,6 @@
               this.currentImageAreas.pop()
             }
             this.targetArea = null
-            this.timer = null
           }
         },
         handleMouseMoveOnCanvas: function (e) {
@@ -213,9 +211,8 @@
             this.targetArea = this.currentImageAreas.filter(area => {
               return area.id === self.currentAreaId
             })[0]
-            console.log(this.targetArea)
             if (this.targetArea) {
-              let canvas = this.targetArea.canvas
+              let canvas = document.getElementById(`image-area-${this.targetArea.id}`)
               if (canvas) {
                 let ctx = canvas.getContext('2d'),
                   {
@@ -228,13 +225,6 @@
                 ctx.lineWidth = 1
                 ctx.strokeStyle = lineColor
                 ctx.strokeRect(xmin, ymin, e.offsetX - xmin, e.offsetY - ymin)
-              } else {
-                if (!this.timer) {
-                  // 延时确保push的框对应的canvas添加到页面中
-                  this.timer = setTimeout(function () {
-                    self.targetArea.canvas = e.target
-                  }, 20)
-                }
               }
             } else {
               let {color, name} = this.types.filter(
@@ -282,16 +272,9 @@
           }
         },
         createXmlDoc: function () {
-          ipcRenderer.send('handled-images', this.safeStringify(this.images))
+          ipcRenderer.send('handled-images', JSON.stringify(this.images))
           // 生成XML文档之后移除本地缓存
           localStorage.removeItem('__IMAGES__')
-        },
-        safeStringify: function (images) {
-          // 序列化之前清除对象中的canvas属性          
-          images.forEach(image => {
-            image.areas.forEach(area => area.canvas = null)
-          })
-          return JSON.stringify(images)
         },
         getRandomString: function () {
           return Math.random().toString(36).substr(2)
