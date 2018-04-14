@@ -1,7 +1,7 @@
 {
   "name": "make-ssd-train-data",
   "version": "1.0.0",
-  "description": "Make train data for SSD-tensorflow",
+  "description": "Use your data to make train data for SSD-tensorflow",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -21,8 +21,7 @@
   },
   "homepage": "https://github.com/sea-ice/make-SSD-train-data#readme",
   "dependencies": {
-    "chalk": "^2.3.2",
-    "vue": "^2.5.16",
+    "electron": "^1.8.4",
     "xml2js": "^0.4.19"
   }
 }

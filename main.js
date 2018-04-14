@@ -3,7 +3,6 @@ const path = require('path')
 const url = require('url')
 const fs = require('fs')
 const xml2js = require('xml2js')
-const chalk = require('chalk')
 const config = require('./config')
 const {formatCurrentTime} = require('./utils/index')
 const {app, ipcMain, BrowserWindow} = electron
