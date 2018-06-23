@@ -34,11 +34,30 @@ let createWindow = function () {
 
   // 向渲染进程发送待处理的图像
   contents.on('did-finish-load', function () {
+    console.log(config.common)
+    contents.send('image-config', JSON.stringify(config.common))
+
     images = fs.readdirSync(datasetPath)
+    console.log(images)
     if (images[0].match(/\.DS_Store/)) images.splice(0, 1)
     contents.send('images-to-process', JSON.stringify(images.map(function (img) {
       return path.resolve(datasetPath, img)
     })))
+
+    let typeImgsDir = path.resolve(__dirname, config.typesImgDir)
+    let typeImages = fs.readdirSync(typeImgsDir)
+    typeImages = typeImages.filter(img => img.match(/\.(png|jp(e)g|bmp)$/))
+    config.types = typeImages.map((img, i) => {
+      let firstDot = img.indexOf('.')
+      firstDot = firstDot === -1 ? img.length : firstDot
+      let typeName = path.basename(img).slice(0, firstDot)
+      return {
+        color: config.typeStrokeColor,
+        name: typeName,
+        sampleImage: path.resolve(typeImgsDir, img)
+      }
+    })
+    // console.log(config.types)
     contents.send('image-types', JSON.stringify(config.types))
   })
   ipcMain.on('handled-images', function (event, message) {
@@ -61,6 +80,10 @@ let createWindow = function () {
             annotation.filename = path.basename(image.url, path.extname(image.url))
             annotation.object = image.areas.map(area => {
               let {xmin, ymin, xmax, ymax} = area
+              xmin = Math.round(xmin)
+              ymin = Math.round(ymin)
+              xmax = Math.round(xmax)
+              ymax = Math.round(ymax)
               return {
                 name: area.typeName,
                 pose: 'Unspecified',

@@ -1,7 +1,7 @@
 {
   "name": "make-ssd-train-data",
   "version": "1.0.0",
-  "description": "Use your data to make train data for SSD-tensorflow",
+  "description": "Use your own data to make train data for SSD-tensorflow",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

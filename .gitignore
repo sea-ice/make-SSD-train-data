@@ -2,3 +2,4 @@ node_modules
 logs/*
 dataset/*
 xml/Annotations/*
+assets/images/sample

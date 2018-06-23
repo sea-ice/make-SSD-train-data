@@ -1,26 +1,31 @@
 module.exports = {
-    datasetPath: './dataset',
-    xmlSavePath: './xml/Annotations',
-    folderName: 'dataset',
+    datasetPath: './dataset/dishes',
+    xmlSavePath: './xml/Annotations/dishes',
+    folderName: 'dataset', // 配置xml文件中folder标签值
     size: {
-        width: 512,
-        height: 512,
-        depth: 1
+        width: 1280,
+        height: 1024,
+        depth: 3
     },
-    types: [{
-        color: '#FFB6B9',
-        name: '肝'
-    }, {
-        color: '#FF6138',
-        name: '胃部'
-    }, {
-        color: '#BCFFA8',
-        name: '胰腺'
-    }, {
-        color: '#D7EEF2',
-        name: '心脏'
-    }, {
-        color: '#248888',
-        name: '肺部'
-    }]
+    common: {
+        imageWidth: 1280
+    },
+    // types: [{
+    //     color: '#FFB6B9',
+    //     name: 'liver'
+    // }, {
+    //     color: '#FF6138',
+    //     name: 'stomach'
+    // }, {
+    //     color: '#BCFFA8',
+    //     name: 'pancreas'
+    // }, {
+    //     color: '#D7EEF2',
+    //     name: 'heart'
+    // }, {
+    //     color: '#248888',
+    //     name: 'lung'
+    // }]
+    typesImgDir: './assets/images/sample/20180623',
+    typeStrokeColor: '#FF6138'
 }

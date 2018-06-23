@@ -37,11 +37,11 @@
               <input type="radio" name="image-type" :id="`type-${type.id}`" :value="type.id" v-model="currentTypeId">
               <label :for="`type-${type.id}`">
                 {{type.name}}
-                <span 
-                  class="color-block"
-                  :style="{backgroundColor: type.color}"
-                ></span>
+                <span class="color-block" :style="{backgroundColor: type.color}"></span>
               </label>
+              <p v-if="type.sampleImage">
+                <img :src="type.sampleImage" alt="" class="sample-image">
+              </p>
             </div>
           </div>
         </form>
@@ -78,6 +78,10 @@
       },
       created: function () {
         let self = this
+        ipcRenderer.on('image-config', (event, message) => {
+          console.log(message)
+          self.config = JSON.parse(message)
+        })
         this.typeId = 1
         // 获取分类信息
         ipcRenderer.on('image-types', (event, message) => {
@@ -119,8 +123,8 @@
               ...newVal.areas
             )
             let imageWidth = newVal.width,
-                imageHeight = newVal.height,
-                self = this
+              imageHeight = newVal.height,
+              self = this
             this.$nextTick(function () {
               let ctx = document.getElementById('image').getContext('2d')
               ctx.drawImage(document.querySelector(
@@ -129,13 +133,13 @@
               self.currentImageAreas.forEach(area => {
                 let canvas = document.getElementById(`image-area-${area.id}`)
                 let ctx = canvas.getContext('2d'),
-                    {
-                      xmin,
-                      ymin,
-                      xmax,
-                      ymax,
-                      lineColor
-                    } = area
+                  {
+                    xmin,
+                    ymin,
+                    xmax,
+                    ymax,
+                    lineColor
+                  } = area
                 // 在切换当前图像时，图像画框区域在绘制时会复用页面已有的canvas元素（vue默认使用的就地复用策略），在绘制之前先清除canvas上的内容以保证不会
                 ctx.clearRect(0, 0, imageWidth, imageHeight)
                 ctx.strokeStyle = lineColor
@@ -181,20 +185,24 @@
           // }
         },
         handleMouseDownOnCanvas: function (e) {
-          console.log(e)
+          let {imageWidth} = this.config
+          console.log(imageWidth)
           this.cutting = true
           this.currentAreaId = this.getRandomString()
-          this.startPoint = [e.offsetX, e.offsetY]
+          this.startPoint = [e.offsetX * imageWidth / 600, e.offsetY * imageWidth / 600]
         },
         handleMouseUpOnCanvas: function (e) {
           this.cutting = false
           if (this.targetArea) {
+            let {imageWidth} = this.config
+            let offsetX = e.offsetX * imageWidth / 600
+            let offsetY = e.offsetY * imageWidth / 600
             if (
-              e.offsetX > this.targetArea.xmin &&
-              e.offsetY > this.targetArea.ymin
+              offsetX > this.targetArea.xmin &&
+              offsetY > this.targetArea.ymin
             ) {
-              this.targetArea.xmax = e.offsetX
-              this.targetArea.ymax = e.offsetY
+              this.targetArea.xmax = offsetX
+              this.targetArea.ymax = offsetY
               // 添加到图像集合中对应图像的areas中
               this.currentImage.areas.push(this.targetArea)
             } else {
@@ -202,6 +210,7 @@
               this.currentImageAreas.pop()
             }
             this.targetArea = null
+            console.log(this.currentImage.areas)
           }
         },
         handleMouseMoveOnCanvas: function (e) {
@@ -220,14 +229,18 @@
                     ymin,
                     lineColor
                   } = this.targetArea
+                let {imageWidth} = this.config
                 // 清除前面鼠标移动时绘制的矩形
                 ctx.clearRect(0, 0, canvas.width, canvas.height)
                 ctx.lineWidth = 1
                 ctx.strokeStyle = lineColor
-                ctx.strokeRect(xmin, ymin, e.offsetX - xmin, e.offsetY - ymin)
+                ctx.strokeRect(xmin, ymin, e.offsetX * imageWidth / 600 - xmin, e.offsetY * imageWidth / 600 - ymin)
               }
             } else {
-              let {color, name} = this.types.filter(
+              let {
+                color,
+                name
+              } = this.types.filter(
                 t => t.id === this.currentTypeId
               )[0]
               this.currentImageAreas.push({
